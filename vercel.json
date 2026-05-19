@@ -1,0 +1,6 @@
+{
+  "framework": "remix",
+  "buildCommand": "pnpm run vercel-build",
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "outputDirectory": "build/client"
+}
