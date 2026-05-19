@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react';
-import type { LinksFunction } from '@remix-run/cloudflare';
+import { json, type LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from '@remix-run/react';
 import tailwindReset from '@unocss/reset/tailwind-compat.css?url';
 import { themeStore } from './lib/stores/theme';
@@ -10,6 +10,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { ClientOnly } from 'remix-utils/client-only';
 import { cssTransition, ToastContainer } from 'react-toastify';
+import { getUser, type SessionUser } from './lib/.server/auth.server';
 
 import reactToastifyStyles from 'react-toastify/dist/ReactToastify.css?url';
 import globalStyles from './styles/index.scss?url';
@@ -60,6 +61,55 @@ const inlineThemeCode = stripIndents`
     document.querySelector('html')?.setAttribute('data-theme', theme);
   }
 `;
+
+/**
+ * Paths that bypass the auth gate. Login flow + a public health endpoint
+ * (Vercel itself probes this). Public assets are served before this loader
+ * runs, so we don't need to whitelist them here.
+ */
+const PUBLIC_PATHS = ['/auth/login', '/auth/google', '/auth/google/callback', '/auth/logout', '/api/health'];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+/**
+ * Root auth gate. Runs for every route (UI and API).
+ *
+ * Behavior:
+ *   - public path                  → allow
+ *   - authenticated user           → allow, expose user to UI
+ *   - unauthenticated UI request   → redirect to /auth/login (preserve URL)
+ *   - unauthenticated API request  → throw 401 JSON
+ */
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+
+  if (isPublicPath(pathname)) {
+    return json({ user: null as SessionUser | null });
+  }
+
+  const user = await getUser(request);
+
+  if (user) {
+    return json({ user });
+  }
+
+  if (pathname.startsWith('/api/')) {
+    throw new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const params = new URLSearchParams({ redirectTo: pathname + url.search });
+
+  throw new Response(null, {
+    status: 302,
+    headers: { Location: `/auth/login?${params.toString()}` },
+  });
+}
 
 export const Head = createHead(() => (
   <>

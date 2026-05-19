@@ -11,8 +11,9 @@
     "email": "maintainers@bolt.diy"
   },
   "scripts": {
-    "deploy": "npm run build && wrangler pages deploy",
+    "deploy": "echo 'Deploy via Vercel: run \\`vercel\\` or push to a branch connected to Vercel.' && exit 1",
     "build": "remix vite:build",
+    "vercel-build": "remix vite:build",
     "dev": "node pre-start.cjs  && remix vite:dev",
     "test": "vitest --run",
     "test:watch": "vitest",
@@ -104,6 +105,7 @@
     "@types/react-beautiful-dnd": "^13.1.8",
     "@uiw/codemirror-theme-vscode": "^4.23.6",
     "@unocss/reset": "^0.61.9",
+    "@vercel/remix": "^2.15.2",
     "@webcontainer/api": "1.6.1-internal.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
