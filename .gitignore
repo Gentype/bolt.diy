@@ -26,6 +26,7 @@ dist-ssr
 /.cache
 /build
 functions/build/
+.vercel/
 .env.local
 .env
 .dev.vars

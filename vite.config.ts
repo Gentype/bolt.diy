@@ -1,6 +1,7 @@
-import { cloudflareDevProxyVitePlugin as remixCloudflareDevProxy, vitePlugin as remixVitePlugin } from '@remix-run/dev';
+import { vitePlugin as remixVitePlugin } from '@remix-run/dev';
+import { vercelPreset } from '@vercel/remix/vite';
 import UnoCSS from 'unocss/vite';
-import { defineConfig, type ViteDevServer } from 'vite';
+import { defineConfig, type ConfigEnv, type ViteDevServer } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { optimizeCssModules } from 'vite-plugin-optimize-css-modules';
 import tsconfigPaths from 'vite-tsconfig-paths';
@@ -18,6 +19,9 @@ export default defineConfig((config) => {
     },
     build: {
       target: 'esnext',
+    },
+    resolve: {
+      alias: getClientOnlyAliases(config),
     },
     plugins: [
       nodePolyfills({
@@ -43,8 +47,25 @@ export default defineConfig((config) => {
           return null;
         },
       },
-      config.mode !== 'test' && remixCloudflareDevProxy(),
+      {
+        name: 'empty-shim',
+        resolveId(id) {
+          if (id === 'virtual:empty-shim') {
+            return '\0virtual:empty-shim';
+          }
+
+          return null;
+        },
+        load(id) {
+          if (id === '\0virtual:empty-shim') {
+            return 'export default {}; export const __esModule = true;';
+          }
+
+          return null;
+        },
+      },
       remixVitePlugin({
+        presets: [vercelPreset()],
         future: {
           v3_fetcherPersist: true,
           v3_relativeSplatPath: true,
@@ -84,6 +105,21 @@ export default defineConfig((config) => {
     },
   };
 });
+
+function getClientOnlyAliases(config: ConfigEnv): Record<string, string> {
+  // Block server-only Node runtime modules from sneaking into the browser
+  // bundle. @remix-run/node pulls these in transitively but they should be
+  // stripped by Remix's `.server` convention. If anything still references
+  // them in client code, redirect to an empty shim so the build succeeds.
+  if (config.mode === 'test' || config.isSsrBuild) {
+    return {};
+  }
+
+  return {
+    undici: 'virtual:empty-shim',
+    'node-fetch': 'virtual:empty-shim',
+  };
+}
 
 function chrome129IssuePlugin() {
   return {

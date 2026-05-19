@@ -201,6 +201,16 @@ export class LLMManager {
   }
 
   getDefaultProvider(): BaseProvider {
+    /*
+     * Prefer OpenRouter as the default provider so the configured default
+     * model (e.g. kwaipilot/kat-coder-pro-v2:exacto) is routed correctly.
+     */
+    const preferred = this._providers.get('OpenRouter');
+
+    if (preferred) {
+      return preferred;
+    }
+
     const firstProvider = this._providers.values().next().value;
 
     if (!firstProvider) {
