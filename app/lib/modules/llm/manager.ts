@@ -203,7 +203,7 @@ export class LLMManager {
   getDefaultProvider(): BaseProvider {
     /*
      * Prefer OpenRouter as the default provider so the configured default
-     * model (e.g. kwaipilot/kat-coder-pro-v2:exacto) is routed correctly.
+     * model (e.g. anthropic/claude-3.5-sonnet) is routed correctly.
      */
     const preferred = this._providers.get('OpenRouter');
 

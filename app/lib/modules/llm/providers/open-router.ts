@@ -45,6 +45,14 @@ export default class OpenRouterProvider extends BaseProvider {
       provider: 'OpenRouter',
       maxTokenAllowed: 128000,
     },
+
+    // Henosis 2 via OpenRouter
+    {
+      name: 'henosis/henosis-2',
+      label: 'Henosis 2',
+      provider: 'OpenRouter',
+      maxTokenAllowed: 131072,
+    },
   ];
 
   async getDynamicModels(
