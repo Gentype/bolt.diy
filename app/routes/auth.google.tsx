@@ -1,10 +1,10 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from '@remix-run/node';
 import { redirect } from '@remix-run/node';
-import { authenticator, isGoogleAuthConfigured } from '~/lib/.server/auth.server';
+import { authenticator, isAuthRequired } from '~/lib/.server/auth.server';
 
 export async function action({ request }: ActionFunctionArgs) {
-  if (!isGoogleAuthConfigured()) {
-    // No OAuth available - just send the user to the app.
+  if (!isAuthRequired()) {
+    // Auth not enforced - just send the user to the app.
     throw redirect('/');
   }
 
@@ -13,6 +13,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export async function loader(_: LoaderFunctionArgs) {
   // Bare GET to /auth/google should not be used; send the user to the app
-  // (or the login page if OAuth is configured).
-  throw redirect(isGoogleAuthConfigured() ? '/auth/login' : '/');
+  // (or the login page if auth is enabled).
+  throw redirect(isAuthRequired() ? '/auth/login' : '/');
 }

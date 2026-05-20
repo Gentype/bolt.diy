@@ -1,18 +1,17 @@
 import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import { json, redirect } from '@remix-run/node';
 import { Form, useLoaderData } from '@remix-run/react';
-import { authenticator, isGoogleAuthConfigured } from '~/lib/.server/auth.server';
+import { authenticator, isAuthRequired, isGoogleAuthConfigured } from '~/lib/.server/auth.server';
 
 export const meta: MetaFunction = () => [{ title: 'Sign in - bolt.diy' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   /*
-   * If Google OAuth is not configured, the app runs in its original
-   * single-user / unauthenticated mode. Bounce visitors straight to the
-   * app instead of showing a dead-end "Google sign-in is not configured"
-   * page.
+   * If auth is not required (the default), the app runs in unauthenticated
+   * single-user mode. Bounce visitors straight to the app instead of
+   * showing a dead-end "Google sign-in is not configured" page.
    */
-  if (!isGoogleAuthConfigured()) {
+  if (!isAuthRequired()) {
     const url = new URL(request.url);
     const redirectTo = url.searchParams.get('redirectTo') ?? '/';
     throw redirect(redirectTo);

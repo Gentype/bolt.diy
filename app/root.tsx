@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import type { LinksFunction, LoaderFunctionArgs } from '@remix-run/node';
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from '@remix-run/react';
 import tailwindReset from '@unocss/reset/tailwind-compat.css?url';
-import { getOptionalUser, isGoogleAuthConfigured, isPublicPath, requireUser } from './lib/.server/auth.server';
+import { getOptionalUser, isAuthRequired, isPublicPath, requireUser } from './lib/.server/auth.server';
 import { themeStore } from './lib/stores/theme';
 import { stripIndents } from './utils/stripIndent';
 import { createHead } from 'remix-island';
@@ -119,11 +119,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
 
   /*
-   * Auth gate is only enforced when Google OAuth is fully configured at runtime.
-   * When env vars are missing the app falls through to its original
-   * unauthenticated single-user behavior so the site stays reachable.
+   * Auth gate is OFF by default and only enforced when the operator
+   * explicitly opts in (AUTH_REQUIRED=true) AND Google OAuth is configured.
+   * This keeps the site reachable regardless of stale/placeholder env vars.
    */
-  if (!isGoogleAuthConfigured() || isPublicPath(url.pathname)) {
+  if (!isAuthRequired() || isPublicPath(url.pathname)) {
     const user = await getOptionalUser(request);
     return { user };
   }
