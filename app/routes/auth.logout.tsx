@@ -1,15 +1,15 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from '@remix-run/node';
 import { redirect } from '@remix-run/node';
-import { authenticator, isGoogleAuthConfigured } from '~/lib/.server/auth.server';
+import { authenticator, isAuthRequired } from '~/lib/.server/auth.server';
 
 function postLogoutTarget(): string {
-  // When Google OAuth isn't configured the login page is unreachable, so
-  // send users back to the app root after logout instead.
-  return isGoogleAuthConfigured() ? '/auth/login' : '/';
+  // When auth isn't enforced the login page is unreachable, so send users
+  // back to the app root after logout instead.
+  return isAuthRequired() ? '/auth/login' : '/';
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  if (!isGoogleAuthConfigured()) {
+  if (!isAuthRequired()) {
     throw redirect('/');
   }
 
@@ -17,7 +17,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  if (!isGoogleAuthConfigured()) {
+  if (!isAuthRequired()) {
     throw redirect('/');
   }
 

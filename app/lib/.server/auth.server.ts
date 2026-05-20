@@ -112,6 +112,19 @@ export function isGoogleAuthConfigured(): boolean {
 }
 
 /**
+ * The auth gate is OFF by default. To enable login enforcement, the operator
+ * must explicitly set `AUTH_REQUIRED=true` (or `1`) AND have Google OAuth
+ * configured. This makes the deployment behavior predictable regardless of
+ * stale or placeholder Google env vars that may already exist on the host.
+ */
+export function isAuthRequired(): boolean {
+  const flag = (process.env.AUTH_REQUIRED ?? process.env.REQUIRE_AUTH ?? '').toLowerCase();
+  const enabled = flag === 'true' || flag === '1' || flag === 'yes';
+
+  return enabled && isGoogleAuthConfigured();
+}
+
+/**
  * Paths that bypass the authentication gate. These must be reachable while
  * unauthenticated so users can sign in and so health/auth endpoints work.
  */
@@ -132,11 +145,11 @@ export async function getOptionalUser(request: Request): Promise<AuthUser | null
 
 export async function requireUser(request: Request): Promise<AuthUser> {
   /*
-   * Defense-in-depth: if Google OAuth isn't configured the app is meant to
-   * run in unauthenticated single-user mode. Don't redirect to a login page
-   * the user can't actually use - just return a synthetic guest user.
+   * Defense-in-depth: if auth is not required (the default), the app is
+   * meant to run in unauthenticated single-user mode. Don't redirect to a
+   * login page - just return a synthetic guest user.
    */
-  if (!isGoogleAuthConfigured()) {
+  if (!isAuthRequired()) {
     return {
       id: 'guest',
       email: 'guest@local',
