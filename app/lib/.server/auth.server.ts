@@ -131,6 +131,19 @@ export async function getOptionalUser(request: Request): Promise<AuthUser | null
 }
 
 export async function requireUser(request: Request): Promise<AuthUser> {
+  /*
+   * Defense-in-depth: if Google OAuth isn't configured the app is meant to
+   * run in unauthenticated single-user mode. Don't redirect to a login page
+   * the user can't actually use - just return a synthetic guest user.
+   */
+  if (!isGoogleAuthConfigured()) {
+    return {
+      id: 'guest',
+      email: 'guest@local',
+      name: 'Guest',
+    };
+  }
+
   const user = await authenticator.isAuthenticated(request);
 
   if (!user) {
