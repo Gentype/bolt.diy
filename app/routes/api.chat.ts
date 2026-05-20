@@ -285,13 +285,27 @@ async function chatAction({ context: _context, request }: ActionFunctionArgs) {
             result.mergeIntoDataStream(dataStream);
 
             (async () => {
-              for await (const part of result.fullStream) {
-                if (part.type === 'error') {
-                  const error: any = part.error;
-                  logger.error(`${error}`);
+              try {
+                for await (const part of result.fullStream) {
+                  if (part.type === 'error') {
+                    const error: any = part.error;
+                    logger.error('Continuation stream error:', error);
 
-                  return;
+                    dataStream.writeData({
+                      type: 'error',
+                      error: error.message || 'Streaming error in continuation',
+                    });
+
+                    return;
+                  }
                 }
+              } catch (streamError: any) {
+                logger.error('Unexpected continuation stream error:', streamError);
+
+                dataStream.writeData({
+                  type: 'error',
+                  error: streamError.message || 'Unexpected error in continuation stream',
+                });
               }
             })();
 
@@ -324,31 +338,53 @@ async function chatAction({ context: _context, request }: ActionFunctionArgs) {
         });
 
         (async () => {
-          for await (const part of result.fullStream) {
-            streamRecovery.updateActivity();
+          try {
+            for await (const part of result.fullStream) {
+              streamRecovery.updateActivity();
 
-            if (part.type === 'error') {
-              const error: any = part.error;
-              logger.error('Streaming error:', error);
-              streamRecovery.stop();
+              if (part.type === 'error') {
+                const error: any = part.error;
+                logger.error('Streaming error:', error);
+                streamRecovery.stop();
 
-              // Enhanced error handling for common streaming issues
-              if (error.message?.includes('Invalid JSON response')) {
-                logger.error('Invalid JSON response detected - likely malformed API response');
-              } else if (error.message?.includes('token')) {
-                logger.error('Token-related error detected - possible token limit exceeded');
+                // Enhanced error handling for common streaming issues
+                if (error.message?.includes('Invalid JSON response')) {
+                  logger.error('Invalid JSON response detected - likely malformed API response');
+                } else if (error.message?.includes('token')) {
+                  logger.error('Token-related error detected - possible token limit exceeded');
+                }
+
+                // Write the error into the data stream so the client receives a proper
+                // error event instead of a truncated-200 that the SDK can't parse.
+                dataStream.writeData({
+                  type: 'error',
+                  error: error.message || 'Streaming error occurred',
+                });
+
+                return;
               }
-
-              return;
             }
+
+            streamRecovery.stop();
+          } catch (streamError: any) {
+            logger.error('Unexpected fullStream error:', streamError);
+            streamRecovery.stop();
+
+            dataStream.writeData({
+              type: 'error',
+              error: streamError.message || 'Unexpected streaming error',
+            });
           }
-          streamRecovery.stop();
         })();
         result.mergeIntoDataStream(dataStream);
       },
       onError: (error: any) => {
         // Provide more specific error messages for common issues
         const errorMessage = error.message || 'Unknown error';
+
+        if (errorMessage.includes('Failed to process successful response')) {
+          return 'Custom error: The AI response stream was interrupted. This can happen due to network issues, API rate limiting, or an invalid model. Please try again or select a different model.';
+        }
 
         if (errorMessage.includes('model') && errorMessage.includes('not found')) {
           return 'Custom error: Invalid model selected. Please check that the model name is correct and available.';
@@ -387,6 +423,7 @@ async function chatAction({ context: _context, request }: ActionFunctionArgs) {
             lastChunk = ' ';
           }
 
+          // Only process string chunks for thought wrapping
           if (typeof chunk === 'string') {
             if (chunk.startsWith('g') && !lastChunk.startsWith('g')) {
               controller.enqueue(encoder.encode(`0: "<div class=\\"__boltThought__\\">"\n`));
@@ -399,8 +436,7 @@ async function chatAction({ context: _context, request }: ActionFunctionArgs) {
 
           lastChunk = chunk;
 
-          let transformedChunk = chunk;
-
+          // Handle thought chunks (g: prefix) — re-encode as text delta (0: prefix)
           if (typeof chunk === 'string' && chunk.startsWith('g')) {
             let content = chunk.split(':').slice(1).join(':');
 
@@ -408,12 +444,20 @@ async function chatAction({ context: _context, request }: ActionFunctionArgs) {
               content = content.slice(0, content.length - 1);
             }
 
-            transformedChunk = `0:${content}\n`;
+            controller.enqueue(encoder.encode(`0:${content}\n`));
+            return;
           }
 
-          // Convert the string stream to a byte stream
-          const str = typeof transformedChunk === 'string' ? transformedChunk : JSON.stringify(transformedChunk);
-          controller.enqueue(encoder.encode(str));
+          // Pass through all other chunks as-is, properly encoded
+          if (chunk instanceof Uint8Array) {
+            // Already bytes — pass through directly
+            controller.enqueue(chunk);
+          } else if (typeof chunk === 'string') {
+            controller.enqueue(encoder.encode(chunk));
+          } else {
+            // Fallback for unexpected types
+            controller.enqueue(encoder.encode(JSON.stringify(chunk)));
+          }
         },
       }),
     );
