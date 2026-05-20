@@ -1,7 +1,16 @@
-import type { AppLoadContext } from '@remix-run/cloudflare';
+import type { AppLoadContext } from '@remix-run/node';
 import { RemixServer } from '@remix-run/react';
 import { isbot } from 'isbot';
-import { renderToReadableStream } from 'react-dom/server';
+
+/*
+ * `react-dom/server` resolves to `react-dom/server.node` in Node, which only
+ * exposes `renderToPipeableStream`. We render with the Web Streams API
+ * (`renderToReadableStream`), which is available in `react-dom/server.browser`
+ * and works on Node 18+ via the platform's built-in Web Streams.
+ */
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error - upstream @types/react-dom does not declare server.browser
+import { renderToReadableStream } from 'react-dom/server.browser';
 import { renderHeadToString } from 'remix-island';
 import { Head } from './root';
 import { themeStore } from '~/lib/stores/theme';
@@ -40,7 +49,7 @@ export default async function handleRequest(
       function read() {
         reader
           .read()
-          .then(({ done, value }) => {
+          .then(({ done, value }: { done: boolean; value: Uint8Array | undefined }) => {
             if (done) {
               controller.enqueue(new Uint8Array(new TextEncoder().encode('</div></body></html>')));
               controller.close();
@@ -51,7 +60,7 @@ export default async function handleRequest(
             controller.enqueue(value);
             read();
           })
-          .catch((error) => {
+          .catch((error: unknown) => {
             controller.error(error);
             readable.cancel();
           });

@@ -1,4 +1,4 @@
-import { json } from '@remix-run/cloudflare';
+import { json } from '@remix-run/node';
 import { LLMManager } from '~/lib/modules/llm/manager';
 import type { ModelInfo } from '~/lib/modules/llm/types';
 import type { ProviderInfo } from '~/types/model';
@@ -41,7 +41,7 @@ function getProviderInfo(llmManager: LLMManager) {
 export async function loader({
   request,
   params,
-  context,
+  context: _context,
 }: {
   request: Request;
   params: { provider?: string };
@@ -51,7 +51,8 @@ export async function loader({
     };
   };
 }): Promise<Response> {
-  const llmManager = LLMManager.getInstance(context.cloudflare?.env);
+  const serverEnv = process.env as Record<string, string>;
+  const llmManager = LLMManager.getInstance(serverEnv);
 
   // Get client side maintained API keys and provider settings from cookies
   const cookieHeader = request.headers.get('Cookie');
@@ -70,7 +71,7 @@ export async function loader({
       modelList = await llmManager.getModelListFromProvider(provider, {
         apiKeys,
         providerSettings,
-        serverEnv: context.cloudflare?.env,
+        serverEnv,
       });
     }
   } else {
@@ -78,7 +79,7 @@ export async function loader({
     modelList = await llmManager.updateModelList({
       apiKeys,
       providerSettings,
-      serverEnv: context.cloudflare?.env,
+      serverEnv,
     });
   }
 

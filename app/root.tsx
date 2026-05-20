@@ -1,7 +1,8 @@
 import { useStore } from '@nanostores/react';
-import type { LinksFunction } from '@remix-run/cloudflare';
+import type { LinksFunction, LoaderFunctionArgs } from '@remix-run/node';
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from '@remix-run/react';
 import tailwindReset from '@unocss/reset/tailwind-compat.css?url';
+import { getOptionalUser, isPublicPath, requireUser } from './lib/.server/auth.server';
 import { themeStore } from './lib/stores/theme';
 import { stripIndents } from './utils/stripIndent';
 import { createHead } from 'remix-island';
@@ -113,6 +114,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 import { logStore } from './lib/stores/logs';
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+
+  if (isPublicPath(url.pathname)) {
+    const user = await getOptionalUser(request);
+    return { user };
+  }
+
+  const user = await requireUser(request);
+
+  return { user };
+}
 
 export default function App() {
   const theme = useStore(themeStore);
