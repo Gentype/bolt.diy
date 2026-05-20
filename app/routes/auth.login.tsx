@@ -6,6 +6,18 @@ import { authenticator, isGoogleAuthConfigured } from '~/lib/.server/auth.server
 export const meta: MetaFunction = () => [{ title: 'Sign in - bolt.diy' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  /*
+   * If Google OAuth is not configured, the app runs in its original
+   * single-user / unauthenticated mode. Bounce visitors straight to the
+   * app instead of showing a dead-end "Google sign-in is not configured"
+   * page.
+   */
+  if (!isGoogleAuthConfigured()) {
+    const url = new URL(request.url);
+    const redirectTo = url.searchParams.get('redirectTo') ?? '/';
+    throw redirect(redirectTo);
+  }
+
   const user = await authenticator.isAuthenticated(request);
 
   if (user) {
