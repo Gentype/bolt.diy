@@ -104,7 +104,11 @@ if (googleClientID && googleClientSecret) {
 }
 
 export function isGoogleAuthConfigured(): boolean {
-  return Boolean(googleClientID && googleClientSecret);
+  /*
+   * Read process.env at call time so deferred/lazy env var injection on the
+   * hosting platform (e.g. Vercel) is picked up correctly.
+   */
+  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
 /**
