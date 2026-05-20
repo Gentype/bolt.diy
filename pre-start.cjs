@@ -1,5 +1,8 @@
 const { execSync } = require('child_process');
 
+// Auto-install dependencies if node_modules is missing
+require('./scripts/ensure-deps.cjs').ensureDeps({ silent: true });
+
 // Get git hash with fallback
 const getGitHash = () => {
   try {
